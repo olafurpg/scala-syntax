@@ -35,7 +35,12 @@ class ScalaPrinter(code: Input, options: Options) {
   lazy val root: Tree = {
     options.parser.apply(code, options.dialect).get
   }
+  pprint.log(root)
 
+  def dName(name: Name): Doc = name match {
+    case _: Name.Anonymous => wildcard
+    case _ => print(name)
+  }
   def dWithin(keyword: Doc, within: Ref): Doc = within match {
     case Name.Anonymous() => keyword
     case Term.This(Name.Anonymous()) => keyword + `[` + `this` + `]`
@@ -64,8 +69,8 @@ class ScalaPrinter(code: Input, options: Options) {
       `{` + ((line + print(head)).nested(2) + line).grouped + `}`
     case _ =>
       `{` +
-        (lineBreak + intercalate(lineBreak, stats.map(print))).nested(2) +
-        lineBreak + `}`
+        (line + intercalate(lineBlank, stats.map(print))).nested(2) +
+        line + `}`
   }
 
   def isEmpty(self: Self): Boolean = self match {
@@ -128,6 +133,8 @@ class ScalaPrinter(code: Input, options: Options) {
     )
   }
 
+  def dStats(stats: List[Stat]): Doc = intercalate(lineBlank, stats.map(print))
+
   def dInterpolate(prefix: Name, parts: List[Tree], args: List[Tree]): Doc = {
     val isTripeQuoted = parts.exists {
       case Lit.String(part) =>
@@ -179,7 +186,10 @@ class ScalaPrinter(code: Input, options: Options) {
         else {
           t.body match {
             case Term.Block(stats) =>
-              line + intercalate(line, stats.map(print))
+              pprint.log(stats)
+              pprint.log(dStats(stats).grouped.render(100))
+              text("\n")
+              line + dStats(stats)
             case _ =>
               line + print(t.body)
           }
@@ -191,11 +201,11 @@ class ScalaPrinter(code: Input, options: Options) {
         } + space + `=>` + dbody.nested(2).grouped
     case _: Type =>
       tree match {
-        case t: Type.ByName => print(t.tpe) + `*`
+        case t: Type.ByName => `=>` + space + print(t.tpe)
         case t: Type.Select => print(t.qual) + `.` + print(t.name)
         case t: Type.Apply => dApplyBracket(print(t.tpe), t.args)
         case t: Type.ApplyInfix =>
-          print(t.lhs) + space + print(t.op) + space + print(t.rhs)
+          `(` + print(t.lhs) + space + print(t.op) + space + print(t.rhs) + `)`
         case t: Type.ImplicitFunction =>
           `implicit` + space + print(Type.Function(t.params, t.res))
         case t: Type.And => print(Type.ApplyInfix(t.lhs, Type.Name("&"), t.rhs))
@@ -214,7 +224,7 @@ class ScalaPrinter(code: Input, options: Options) {
           print(t.tpe) + space + spaceSeparated(t.annots.map(print))
         case t: Type.Lambda =>
           dApplyBracket(empty, t.tparams) + space + `=>` + space + print(t.tpe)
-        case t: Type.Placeholder => wilcard
+        case t: Type.Placeholder => wildcard + print(t.bounds)
         case t: Type.Repeated => print(t.tpe) + `*`
         case t: Type.Var => print(t.name)
         case t: Type.Function =>
@@ -260,7 +270,7 @@ class ScalaPrinter(code: Input, options: Options) {
           }
           dhead + dtail
         case t: Term.Return => `return` + space + print(t.expr)
-        case t: Term.Repeated => print(t.expr) + `:` + wilcard + `*`
+        case t: Term.Repeated => print(t.expr) + `:` + wildcard + `*`
         case t: Term.If =>
           def body(expr: Term) = expr match {
             case b: Term.Block => space + dBlock(b.stats)
@@ -269,11 +279,9 @@ class ScalaPrinter(code: Input, options: Options) {
           val delse =
             if (t.elsep.tokens.isEmpty) empty
             else
-              (
-                line + `else` + body(t.elsep)
-              ).grouped
+              line + `else` + body(t.elsep)
           `if` + space + `(` + print(t.cond) + `)` +
-            body(t.thenp).grouped +
+            body(t.thenp) +
             delse
         case t: Term.For =>
           `for` + space + dBlock(t.enums) + space +
@@ -329,7 +337,7 @@ class ScalaPrinter(code: Input, options: Options) {
               print(t.fun) + space + print(arg)
             case (arg @ Term.Block((f: Term.Function) :: Nil)) :: Nil =>
               val dbody = f.body match {
-                case Term.Block(stats) => intercalate(line, stats.map(print))
+                case Term.Block(stats) => dStats(stats)
                 case _ => print(f.body)
               }
               print(t.fun) + space + `{` +
@@ -344,33 +352,25 @@ class ScalaPrinter(code: Input, options: Options) {
           }
         case t: Term.ApplyType => dApplyBracket(print(t.fun), t.targs)
         case t: Term.ApplyInfix =>
-          t.args match {
-            case Nil => ???
-            case arg :: Nil =>
-              val dop = dApplyBracket(print(t.op), t.targs)
-              print(t.lhs) + space +
-                dop + space +
-                print(arg)
-            case _ =>
-              // convert multi-arg infix to regular apply
-              import scala.meta._
-              import t._
-              if (targs.isEmpty) print(q"$lhs.$op(..$args)")
-              else print(q"$lhs.$op[..$targs](..$args)")
-          }
+          `(` +
+            print(t.lhs) + space +
+            print(t.op) + space +
+            dApplyParen(empty, t.args) +
+            `)`
       }
+    case t: Type.Bounds =>
+      val dlo = t.lo.fold(empty)(lo => `>:` + space + print(lo))
+      val dhi = t.hi.fold(empty) { hi =>
+        t.lo.fold(empty)(_ => space) +
+          `<:` + space + print(hi)
+      }
+      val dspace =
+        if (t.lo.nonEmpty || t.hi.nonEmpty) space
+        else empty
+      dspace + dlo + dhi
     case t: Type.Param =>
-      val dtbounds = {
-        val dlo = t.tbounds.lo.fold(empty)(lo => `>:` + space + print(lo))
-        val dhi = t.tbounds.hi.fold(empty) { hi =>
-          t.tbounds.lo.fold(empty)(_ => space) +
-            `<:` + space + print(hi)
-        }
-        val dspace =
-          if (t.tbounds.lo.nonEmpty || t.tbounds.hi.nonEmpty) space
-          else empty
-        dspace + dlo + dhi
-      }
+      val dname = dApplyBracket(dName(t.name), t.tparams)
+      val dtbounds = print(t.tbounds)
       val dvbounds = {
         if (t.vbounds.isEmpty) empty
         else {
@@ -387,7 +387,7 @@ class ScalaPrinter(code: Input, options: Options) {
             spaceSeparated(cbounds.map(tpe => `:` + space + print(tpe)))
       }
       dmods(t.mods) +
-        print(t.name) +
+        dname +
         dtbounds +
         dvbounds +
         dcbounds
@@ -403,26 +403,23 @@ class ScalaPrinter(code: Input, options: Options) {
           Nil
       )
     case t: Pkg =>
-      `package` + space + intercalate(
-        line,
-        print(t.ref) :: t.stats.map(print)
-      )
+      `package` + space + print(t.ref) + line + dStats(t.stats)
     case t: Import =>
       `import` + space + intercalate(comma + space, t.importers.map(print))
     case t: Importee =>
       t match {
         case i: Importee.Name => print(i.name)
-        case i: Importee.Wildcard => wilcard
+        case i: Importee.Wildcard => wildcard
         case i: Importee.Rename =>
           print(i.name) + space + `=>` + space + print(i.rename)
         case i: Importee.Unimport =>
-          print(i.name) + space + `=>` + space + wilcard
+          print(i.name) + space + `=>` + space + wildcard
       }
     case t: Importer =>
       val fun = print(t.ref) + `.`
       t.importees match {
         case Importee.Name(n) :: Nil => fun + print(n)
-        case Importee.Wildcard() :: Nil => fun + wilcard
+        case Importee.Wildcard() :: Nil => fun + wildcard
         case _ =>
           dApply(fun, t.importees, `{` + space, space + `}`)
       }
@@ -531,7 +528,7 @@ class ScalaPrinter(code: Input, options: Options) {
       val ddefn = ddef(t.mods, `trait`, print(t.name), t.tparams, Nil)
       ddefn + print(t.templ)
     case t: Source =>
-      intercalate(lineBlank, t.stats.map(print))
+      dStats(t.stats)
     case t: Ctor.Secondary =>
       ddef(t.mods, `def`, `this`, Nil, t.paramss, None, Some(t.init))
     case m: Mod =>
@@ -554,8 +551,8 @@ class ScalaPrinter(code: Input, options: Options) {
     case p: Pat =>
       p match {
         case t: Pat.Var => print(t.name)
-        case t: Pat.Wildcard => wilcard
-        case t: Pat.SeqWildcard => wilcard + `*`
+        case t: Pat.Wildcard => wildcard
+        case t: Pat.SeqWildcard => wildcard + `*`
         case t: Pat.Bind =>
           print(t.lhs) + space + `@` + space + print(t.rhs)
         case t: Pat.Alternative =>

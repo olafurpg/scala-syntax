@@ -4,6 +4,7 @@ import scala.meta.dialects
 import org.scalafmt.Options
 import org.scalafmt.internal.BaseScalaPrinterTest
 
+
 class ScalaPrinterTest extends BaseScalaPrinterTest {
 
   check("package a.b", Options.default)
@@ -79,7 +80,9 @@ class ScalaPrinterTest extends BaseScalaPrinterTest {
   checkType("A @a")
   checkType("A[[B] => B]")
   checkType("A[_]")
+  checkType("A[_ <: B]")
   check("def a(b: B*): B")
+  check("def empty[T <: AnyRef, K[_ <: T]]: TypedMultiMap[T, K]")
 
   // pat
   checkPat("1 | 2")

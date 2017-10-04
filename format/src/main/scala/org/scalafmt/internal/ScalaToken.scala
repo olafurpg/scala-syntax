@@ -19,9 +19,9 @@ object ScalaToken {
   val `:` : Doc = char(':')
   val `|` : Doc = char('|')
   val `=` : Doc = char('=')
+  val wildcard: Doc = char('_')
   val covariant: Doc = char('+')
   val contravariant: Doc = char('-')
-  val wilcard: Doc = char('_')
   val `"` : Doc = char('"')
   val `$` : Doc = char('$')
   val `"""` : Doc = text("\"\"\"")
@@ -34,7 +34,6 @@ object ScalaToken {
   val `throw`: Doc = text("throw")
   val `do`: Doc = text("do")
   val `while`: Doc = text("while")
-  val `wildcard`: Doc = text("wildcard")
   val `new`: Doc = text("new")
   val `override`: Doc = text("override")
   val `lazy`: Doc = text("lazy")
@@ -70,5 +69,5 @@ object ScalaToken {
   val `>:` : Doc = text(">:")
   val `<:` : Doc = text("<:")
   val `<%` : Doc = text("<%")
-  val lineBlank: Doc = lineBreak + lineBreak
+  val lineBlank: Doc = text("\n\n")
 }
