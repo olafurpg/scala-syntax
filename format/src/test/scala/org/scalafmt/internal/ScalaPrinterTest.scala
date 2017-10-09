@@ -100,6 +100,7 @@ class ScalaPrinterTest extends BaseScalaPrinterTest {
   checkPat("A()")
   checkPat("A(a)")
   checkPat("A(a, b)")
+  checkPat("A(`a`)")
 
   // term
   check("'c'")
@@ -204,4 +205,5 @@ class ScalaPrinterTest extends BaseScalaPrinterTest {
       |)""".stripMargin
   )
   check(""" s"$$a" """.stripMargin)
+  check("a")
 }

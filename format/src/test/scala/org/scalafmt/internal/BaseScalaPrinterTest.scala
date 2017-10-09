@@ -30,6 +30,13 @@ abstract class BaseScalaPrinterTest extends DiffSuite {
     check(original, options.copy(parser = Parse.parsePat))
   }
 
+  def checkCase(
+      original: String,
+      options: InternalOptions = defaultOptions
+  ): Unit = {
+    check(original, options.copy(parser = Parse.parseCase))
+  }
+
   def check(original: String, options: Options = defaultOptions): Unit = {
     check(original, original, options)
   }
