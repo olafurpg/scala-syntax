@@ -110,6 +110,8 @@ class ScalaPrinterTest extends BaseScalaPrinterTest {
 
   // term
   check("'c'")
+  check("(a + b).c")
+  check("(if (a) 1 else 2).c")
   check(
     """
       |{
