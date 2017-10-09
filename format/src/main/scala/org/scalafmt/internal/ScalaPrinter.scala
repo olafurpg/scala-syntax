@@ -185,7 +185,6 @@ class ScalaPrinter(code: Input, options: Options) {
       case t: Name =>
         t match {
           case _: Name.Anonymous => empty
-            backtick + text(t.value) + backtick
           case _ =>
             text(Identifier.backtickWrap(t.value))
         }
