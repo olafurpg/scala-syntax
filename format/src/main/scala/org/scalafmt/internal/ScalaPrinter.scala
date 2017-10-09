@@ -59,6 +59,10 @@ class ScalaPrinter(code: Input, options: Options) {
     val dargs = intercalate(comma + line, args.map(print))
     dargs.tightBracketBy(fun + left, right)
   }
+  def dApplyParenPat(fun: Doc, args: List[Pat]): Doc = {
+    val dargs = intercalate(comma + line, args.map(dPat))
+    dargs.tightBracketBy(fun + `(`, `)`)
+  }
 
   def dTyped(lhs: Tree, rhs: Tree) = {
     val dlhs = print(lhs)
@@ -180,6 +184,13 @@ class ScalaPrinter(code: Input, options: Options) {
     case _ => dApplyParen(empty, params)
   }
 
+  def dPat(pat: Pat): Doc =
+    pat match {
+      case t: Term.Name if t.value.headOption.exists(_.isLower) =>
+        backtick + text(t.value) + backtick
+      case _ => print(pat: Tree)
+    }
+
   def print(tree: Tree): Doc =
     tree match {
       case t: Name =>
@@ -200,9 +211,9 @@ class ScalaPrinter(code: Input, options: Options) {
       case _: Enumerator =>
         tree match {
           case t: Enumerator.Generator =>
-            print(t.pat) + space + `<-` + (line + print(t.rhs)).grouped
+            dPat(t.pat) + space + `<-` + (line + print(t.rhs)).grouped
           case t: Enumerator.Val =>
-            print(t.pat) + space + `=` + (line + print(t.rhs)).grouped
+            dPat(t.pat) + space + `=` + (line + print(t.rhs)).grouped
           case t: Enumerator.Guard =>
             `if` + space + print(t.cond)
         }
@@ -217,7 +228,7 @@ class ScalaPrinter(code: Input, options: Options) {
                 line + print(t.body)
             }
           }
-        `case` + space + print(t.pat) +
+        `case` + space + dPat(t.pat) +
           t.cond.fold(empty) { c =>
             space + `if` + space +
               print(c)
@@ -583,16 +594,16 @@ class ScalaPrinter(code: Input, options: Options) {
           case t: Pat.Wildcard => wildcard
           case t: Pat.SeqWildcard => wildcard + `*`
           case t: Pat.Bind =>
-            print(t.lhs) + space + `@` + space + print(t.rhs)
+            print(t.lhs) + space + `@` + space + dPat(t.rhs)
           case t: Pat.Alternative =>
-            print(t.lhs) + space + `|` + space + print(t.rhs)
+            dPat(t.lhs) + space + `|` + space + dPat(t.rhs)
           case t: Pat.Tuple =>
-            dApplyParen(empty, t.args)
+            dApplyParenPat(empty, t.args)
           case t: Pat.ExtractInfix =>
             val drhs = t.rhs match {
               case Nil => ???
               case rhs :: Nil => print(rhs)
-              case _ => dApplyParen(empty, t.rhs)
+              case _ => dApplyParenPat(empty, t.rhs)
             }
             print(t.lhs) + space + print(t.op) + space + drhs
           case t: Pat.Interpolate =>
@@ -600,7 +611,7 @@ class ScalaPrinter(code: Input, options: Options) {
           case t: Pat.Typed =>
             print(t.lhs) + `:` + space + print(t.rhs)
           case t: Pat.Extract =>
-            dApplyParen(print(t.fun), t.args)
+            dApplyParenPat(print(t.fun), t.args)
         }
     }
 }

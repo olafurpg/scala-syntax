@@ -101,6 +101,12 @@ class ScalaPrinterTest extends BaseScalaPrinterTest {
   checkPat("A(a)")
   checkPat("A(a, b)")
   checkPat("A(`a`)")
+  checkCase("case `a` =>")
+  checkCase("case `a` | `b` =>")
+  checkCase("case a @ `b` =>")
+  checkEnumerator("`a` <- b")
+  checkEnumerator("a <- b")
+  checkEnumerator("a = b")
 
   // term
   check("'c'")
