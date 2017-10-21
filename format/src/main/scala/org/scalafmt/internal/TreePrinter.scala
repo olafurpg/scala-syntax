@@ -20,7 +20,7 @@ import scala.meta.Template
 import scala.meta.Term
 import scala.meta.Tree
 import scala.meta.Type
-import scala.meta.internal.format.CustomFormatTrees.PatName
+import scala.meta.internal.format.CustomTrees.PatName
 import scala.meta.internal.prettyprinters.TripleQuotes
 import org.scalafmt.internal.ScalaToken._
 import org.typelevel.paiges.Doc

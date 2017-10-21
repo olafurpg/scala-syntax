@@ -4,9 +4,9 @@ import scala.meta.Name
 import scala.meta.Tree
 
 /**
-  * Custom scala.meta.Tree nodes that
-  */
-object CustomFormatTrees {
+ * Custom scala.meta.Tree nodes that
+ */
+object CustomTrees {
   sealed trait CustomTree extends Tree {
     private def unsupported = throw new UnsupportedOperationException(
       s"Custom scala-format tree '$productPrefix' does not support this operation."
