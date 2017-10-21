@@ -2,6 +2,9 @@ package scala.meta.internal.format
 
 import scala.meta.Name
 import scala.meta.Tree
+import scala.meta.Term
+import scala.meta.Type
+import scala.meta.Pat
 
 /**
  * Custom scala.meta.Tree nodes that
@@ -35,5 +38,28 @@ object CustomTrees {
   case class PatName(value: String) extends CustomTree with Name {
     override def children: List[Tree] = Nil
     override def productFields: List[String] = "value" :: Nil
+  }
+
+  case class Docstring(comment: String, underlying: Tree)
+      extends CustomTree
+      with Pat
+      with Type
+      with Term {
+    override def privateOrigin: scala.meta.internal.trees.Origin =
+      underlying.origin
+    override def privateCopy(
+        prototype: scala.meta.Tree,
+        parent: scala.meta.Tree,
+        destination: String,
+        origin: scala.meta.internal.trees.Origin
+    ): scala.meta.Tree =
+      Docstring(
+        comment,
+        underlying
+          .asInstanceOf[scala.meta.internal.trees.InternalTree]
+          .privateCopy(prototype, parent, destination, origin)
+      )
+    override def children: List[Tree] = underlying :: Nil
+    override def productFields: List[String] = "underlying" :: Nil
   }
 }

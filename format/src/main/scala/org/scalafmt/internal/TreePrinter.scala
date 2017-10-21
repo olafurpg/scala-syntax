@@ -24,17 +24,14 @@ import scala.meta.internal.format.CustomTrees.PatName
 import scala.meta.internal.prettyprinters.TripleQuotes
 import org.scalafmt.internal.ScalaToken._
 import org.typelevel.paiges.Doc
-import org.typelevel.paiges.Doc.comma
-import org.typelevel.paiges.Doc.empty
-import org.typelevel.paiges.Doc.intercalate
-import org.typelevel.paiges.Doc.line
-import org.typelevel.paiges.Doc.space
-import org.typelevel.paiges.Doc.text
+import org.typelevel.paiges.Doc._
 import org.scalafmt.internal.ScalaToken._
 import scala.meta.internal.fmt.SyntacticGroup.Literal
 import scala.meta.internal.fmt.SyntacticGroup.Term._
 import scala.meta.internal.fmt.SyntacticGroup.Type._
 import scala.meta.internal.fmt.SyntacticGroup.Pat._
+import scala.meta.internal.format.CustomTrees
+import scala.meta.internal.format.CustomTrees.CustomTree
 
 object TreePrinter {
   import TreeDocOps._
@@ -55,6 +52,15 @@ object TreePrinter {
             val dvalue = dRaw(t.value, quoteStyle)
             dquote + dvalue + dquote
           case _ => text(tree.syntax) // ???
+        }
+      case _: CustomTree =>
+        tree match {
+          case CustomTrees.Docstring(comment, t) =>
+            val dcomment = text("/*") + intercalate(
+              line,
+              comment.lines.map(line => `*` + space + text(line)).toIterable
+            ) + text("/")
+            dcomment + lineNoFlat + print(t)
         }
       case _: Enumerator =>
         tree match {
