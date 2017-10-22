@@ -513,7 +513,7 @@ object TreePrinter {
             print(t.lhs) + `:` + space + drhs
         }
     }
-    Comments.doc(tree, result)
+    Comments.print(tree, result)
   }
 
 }
