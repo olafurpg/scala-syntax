@@ -2,10 +2,12 @@ package org.scalafmt.tests
 
 import scala.meta._
 import scala.meta.internal.format.Comments._
+import org.scalafmt.internal.Context
 import org.scalafmt.internal.TreePrinter
 
 object DocstringSuite extends BaseScalaPrinterTest {
   test("docstring") {
+    implicit val c = Context.default
     val foo = q"def foo = 2".withLeadingComment("/** Returns 2 */\n")
     val bar = q"def bar = 3".withTrailingComment(" // FIXME")
     val qux = q"def qux = 4".withLeadingComment(

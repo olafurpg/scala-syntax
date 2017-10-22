@@ -53,12 +53,13 @@ object TreeDocOps {
   }
 
   def printTree(root: Tree, options: Options): Doc = {
+    implicit val ctx = Context(options)
     print(root)
   }
 
   implicit class XtensionSyntacticGroup(val leftGroup: SyntacticGroup)
       extends AnyVal {
-    def wrap(tree: Tree, side: Side = Side.Left): Doc = {
+    def wrap(tree: Tree, side: Side = Side.Left)(implicit ctx: Context): Doc = {
       val rightGroup = TreeSyntacticGroup(tree)
       val doc = print(tree)
       if (TreeOps.groupNeedsParens(leftGroup, rightGroup, side)) `(` + doc + `)`
@@ -66,7 +67,7 @@ object TreeDocOps {
     }
   }
   implicit class XtensionTreeDoc(val tree: Tree) extends AnyVal {
-    def wrapped: Doc = {
+    def wrapped(implicit ctx: Context): Doc = {
       val doc = print(tree)
       if (needsParens(tree)) wrapParens(doc)
       else doc
@@ -94,7 +95,7 @@ object TreeDocOps {
           (accum :+ f.params, f.body)
       }
 
-    def dFunction(f: Term.Function): Doc = {
+    def dFunction(f: Term.Function)(implicit ctx: Context): Doc = {
       val (paramss, body) = getParamss(f)
       val dbody = body match {
         case Term.Block(stats) => dStats(stats)
@@ -110,7 +111,7 @@ object TreeDocOps {
       result.grouped
     }
 
-    def unapply(args: List[Tree]): Option[Doc] =
+    def unapply(args: List[Tree])(implicit ctx: Context): Option[Doc] =
       args match {
         case (arg: Term.PartialFunction) :: Nil =>
           Some(print(arg))
@@ -131,7 +132,7 @@ object TreeDocOps {
       op: String,
       opDoc: Doc,
       args: List[Tree]
-  ): Doc = {
+  )(implicit ctx: Context): Doc = {
     val opPrecedence = operatorPrecedence(op)
     // TODO(olafur) generalize over lhs/rhs comparison, there is so much
     // duplication between the two cases.
@@ -177,62 +178,66 @@ object TreeDocOps {
     dlhs + space + opDoc + space + dargs
   }
 
-  def dName(name: Tree): Doc = name match {
+  def dName(name: Tree)(implicit ctx: Context): Doc = name match {
     case _: Name.Anonymous => wildcard
     case _ => print(name)
   }
 
-  def dWithin(keyword: Doc, within: Ref): Doc =
+  def dWithin(keyword: Doc, within: Ref)(implicit ctx: Context): Doc =
     within match {
       case Name.Anonymous() => keyword
       case Term.This(Name.Anonymous()) => keyword + `[` + `this` + `]`
       case _ => dApplyBracket(keyword, within :: Nil)
     }
 
-  def dApplyBrace(fun: Doc, args: List[Tree]): Doc =
+  def dApplyBrace(fun: Doc, args: List[Tree])(implicit ctx: Context): Doc =
     dApply(fun, args, `{`, `}`)
 
-  def dTargs(targs: List[Tree]): Doc =
+  def dTargs(targs: List[Tree])(implicit ctx: Context): Doc =
     dApplyBracket(empty, targs)
-  def dArgs(args: List[Tree]): Doc =
+  def dArgs(args: List[Tree])(implicit ctx: Context): Doc =
     dApplyParen(empty, args)
-  def dApplyParen(fun: Doc, args: List[Tree]): Doc =
+  def dApplyParen(fun: Doc, args: List[Tree])(implicit ctx: Context): Doc =
     dApply(fun, args, `(`, `)`)
 
-  def dApplyBracket(fun: Doc, args: List[Tree]): Doc =
+  def dApplyBracket(fun: Doc, args: List[Tree])(implicit ctx: Context): Doc =
     if (args.isEmpty) fun
     else dApply(fun, args, `[`, `]`)
 
-  def dApply(fun: Doc, args: List[Tree], left: Doc, right: Doc): Doc = {
+  def dApply(fun: Doc, args: List[Tree], left: Doc, right: Doc)(
+      implicit ctx: Context
+  ): Doc = {
     val dargs = intercalate(comma + line, args.map(print))
     dargs.tightBracketBy(fun + left, right)
   }
 
-  def dApplyParenPat(fun: Doc, args: List[Pat]): Doc = {
+  def dApplyParenPat(fun: Doc, args: List[Pat])(implicit ctx: Context): Doc = {
     val dargs = intercalate(comma + line, args.map(dPat))
     dargs.tightBracketBy(fun + `(`, `)`)
   }
 
   // This is a quick hack to prevent unnecessary parens.
-  def dPath(lhs: Tree, lhsDoc: Doc, sep: Doc, rhs: Doc): Doc = {
+  def dPath(lhs: Tree, lhsDoc: Doc, sep: Doc, rhs: Doc)(
+      implicit ctx: Context
+  ): Doc = {
     if (!needsParens(lhs)) lhsDoc + sep + rhs
     else `(` + lhsDoc + `)` + sep + rhs
   }
 
-  def dTyped(lhs: Tree, rhs: Tree): Doc = {
+  def dTyped(lhs: Tree, rhs: Tree)(implicit ctx: Context): Doc = {
     dTyped(lhs, print(rhs))
   }
 
-  def dTyped(lhs: Tree, rhs: Doc): Doc = {
+  def dTyped(lhs: Tree, rhs: Doc)(implicit ctx: Context): Doc = {
     val dlhs = dName(lhs)
     if (needsParens(lhs)) wrapParens(dlhs) + `:` + space + rhs
     else dlhs + typedColon(dlhs) + space + rhs
   }
 
-  def dBlock(stats: List[Tree]): Doc =
+  def dBlock(stats: List[Tree])(implicit ctx: Context): Doc =
     dBlockI(stats).grouped
 
-  def dBlockI(stats: List[Tree]): Doc = stats match {
+  def dBlockI(stats: List[Tree])(implicit ctx: Context): Doc = stats match {
     case Nil => `{` + `}`
     case head :: Nil =>
       `{` + ((line + print(head)).nested(2) + line) + `}`
@@ -260,10 +265,10 @@ object TreeDocOps {
     if (needsLeadingSpaceBeforeColon(lhs.render(100))) space + `:`
     else `:`
 
-  def dMods(mods: List[Mod]): Doc =
+  def dMods(mods: List[Mod])(implicit ctx: Context): Doc =
     intercalate(space, mods.map(print))
 
-  def dParamss(paramss: List[List[Term.Param]]): Doc =
+  def dParamss(paramss: List[List[Term.Param]])(implicit ctx: Context): Doc =
     paramss match {
       case Nil :: Nil => `(` + `)`
       case _ =>
@@ -280,10 +285,10 @@ object TreeDocOps {
         })
     }
 
-  def dBody(body: Tree): Doc =
+  def dBody(body: Tree)(implicit ctx: Context): Doc =
     dBodyO(Some(body))
 
-  def dBodyO(body: Option[Tree]): Doc =
+  def dBodyO(body: Option[Tree])(implicit ctx: Context): Doc =
     body.fold(empty) {
       case t @ (_: Term.Block | _: Term.PartialFunction | _: Term.Match) =>
         `=` + space + print(t)
@@ -299,7 +304,7 @@ object TreeDocOps {
       paramss: List[List[Term.Param]],
       decltpe: Option[Type],
       body: Doc
-  ): Doc = {
+  )(implicit ctx: Context): Doc = {
     val dname = commaSeparated(pats.map(print))
     dDef(mods, keyword, dname, tparams, paramss, decltpe, body)
   }
@@ -312,7 +317,7 @@ object TreeDocOps {
       paramss: List[List[Term.Param]],
       decltpe: Option[Type] = None,
       dbody: Doc = empty
-  ): Doc = {
+  )(implicit ctx: Context): Doc = {
     val dname = dApplyBracket(name, tparams)
     val dparamss = dParamss(paramss)
     val ddecltpe =
@@ -326,7 +331,7 @@ object TreeDocOps {
     )
   }
 
-  def dStats(stats: List[Tree]): Doc = {
+  def dStats(stats: List[Tree])(implicit ctx: Context): Doc = {
     intercalate(lineBlank, stats.map {
       case t: Term.Xml => wrapParens(print(t))
       case t => print(t)
@@ -362,7 +367,9 @@ object TreeDocOps {
     if (isMultiline(str)) TripleQuotes -> `"""`
     else DoubleQuotes -> `"`
 
-  def dInterpolate(prefix: Name, parts: List[Tree], args: List[Tree]): Doc = {
+  def dInterpolate(prefix: Name, parts: List[Tree], args: List[Tree])(
+      implicit ctx: Context
+  ): Doc = {
 
     def isMultilineInterpolated(part: String): Boolean =
       // NOTE(olafur) interpolated strings are unescaped so single quotes must
@@ -393,22 +400,23 @@ object TreeDocOps {
     print(prefix) + dquote + dhead + sparts + dquote
   }
 
-  def dParams(params: List[Term.Param], forceParens: Boolean): Doc =
-    params match {
-      case param :: Nil =>
-        val dparam = print(param)
-        param.decltpe match {
-          case Some(tpe) if forceParens || needsParens(tpe) =>
-            `(` + dparam + `)`
-          case _ => dparam
-        }
-      case _ => dApplyParen(empty, params)
-    }
+  def dParams(params: List[Term.Param], forceParens: Boolean)(
+      implicit ctx: Context
+  ): Doc = params match {
+    case param :: Nil =>
+      val dparam = print(param)
+      param.decltpe match {
+        case Some(tpe) if forceParens || needsParens(tpe) =>
+          `(` + dparam + `)`
+        case _ => dparam
+      }
+    case _ => dApplyParen(empty, params)
+  }
 
-  def dPat(pat: Tree): Doc =
+  def dPat(pat: Tree)(implicit ctx: Context): Doc =
     print(mkPat(pat))
 
-  def mkPat(pat: Tree): Tree =
+  def mkPat(pat: Tree)(implicit ctx: Context): Tree =
     pat match {
       case t: Term.Name if t.value.headOption.exists(_.isLower) =>
         PatName(t.value)
