@@ -49,7 +49,7 @@ object Comments {
         case _ =>
           tree.children match {
             case head :: _ =>
-              logger.elem(head.syntax, head.pos.start, tree.pos.start)
+//              logger.elem(head.syntax, head.pos.start, tree.pos.start)
             case _ =>
           }
           inferCommentsFromTokens(dialect(input).tokenize.get, pos)
