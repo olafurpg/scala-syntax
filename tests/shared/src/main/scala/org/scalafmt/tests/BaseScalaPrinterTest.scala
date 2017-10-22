@@ -12,8 +12,23 @@ import org.scalafmt.InternalOptions
 import org.scalafmt.Options
 import org.scalameta.logger
 import org.scalafmt.internal.TreeDocOps
+import utest.ufansi.Str
+import utest.ufansi.Color
 
 abstract class BaseScalaPrinterTest extends DiffSuite {
+
+  val Add = "(\\+.*)".r
+  val Remove = "(-.*)".r
+
+  override def formatException(x: Throwable, leftIndent: String): Str = {
+    val msg = x.getMessage
+    val formatted = msg.lines.map {
+      case Add(line) => Color.Green(line)
+      case Remove(line) => Color.Red(line)
+      case line => Color.LightRed(line)
+    }
+    Str(formatted.mkString("\n"))
+  }
 
   val defaultOptions: InternalOptions = InternalOptions(100).copy(
     dialect = dialects.Sbt1.copy(
@@ -118,7 +133,7 @@ abstract class BaseScalaPrinterTest extends DiffSuite {
   ): Unit = {
     val original = original2.replace("'''", "\"\"\"")
     val expected = expected2.replace("'''", "\"\"\"")
-    val testName = logger.revealWhitespace(original)
+    val testName = logger.revealWhitespace(original).take(30)
     test(testName) {
       val root = TreeDocOps.getRoot(original, options)
       val obtained =

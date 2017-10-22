@@ -27,11 +27,7 @@ trait DiffSuite extends FunSuite {
       diff: String
   ) extends Exception(
         title + "\n" + error2message(obtained, expected)
-      ) {
-    logger.elem(getMessage)
-    override def getStackTrace: Array[StackTraceElement] =
-      Array() // TODO(olafur) propagate line number from callsite.
-  }
+      )
 
   private def error2message(obtained: String, expected: String): String = {
     val sb = new StringBuilder

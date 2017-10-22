@@ -2,11 +2,13 @@ package scala.meta.internal.format
 
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
+import scala.annotation.tailrec
 import scala.meta._
 import scala.meta.contrib.Trivia
 import scala.meta.internal.tokens.TokenStreamPosition
 import scala.meta.internal.trees.Origin
 import scala.meta.tokens.Token.Comment
+import org.scalafmt.internal.Context
 import org.scalameta.logger
 import org.typelevel.paiges.Doc
 
@@ -15,46 +17,46 @@ import org.typelevel.paiges.Doc
  *
  * Can include any kind of comments: /* */, // or /** */
  */
-case class Comments(leading: List[String], trailing: List[String])
+case class Comments(leading: List[Comment], trailing: List[Comment])
     extends InputStream {
   val line: Doc = Doc.lineNoFlat
-  def join(ss: List[String]): Doc =
-    Doc.intercalate(
-      Doc.empty,
-      ss.map { s =>
-        val before =
-          if (s.startsWith("//")) Doc.space
-          else Doc.empty
-        val after =
-          if (s.startsWith("//")) line
-          else if (s.startsWith("/**")) line
-          else if (s.startsWith("/*")) Doc.space
-          else Doc.empty
-        before + Doc.text(s.trim) + after
-      }
-    )
-  def wrap(doc: Doc): Doc = join(leading) + doc + join(trailing)
+  @tailrec
+  final def print(ss: List[Comment], accum: Doc = Doc.empty): Doc = ss match {
+    case Nil => accum
+    case comment :: tail =>
+      val s = comment.syntax
+      val before =
+        if (s.startsWith("//")) Doc.space
+        else Doc.empty
+      val after =
+        if (s.startsWith("//")) line
+        else if (s.startsWith("/**")) line
+        else if (s.startsWith("/*")) Doc.space
+        else Doc.empty
+      val doc = before + Doc.text(s.trim) + after
+      print(tail, doc + accum)
+  }
+
+  def wrap(doc: Doc): Doc = print(leading) + doc + print(trailing)
   override def read(): Int = 1
 }
 
 object Comments {
+  def Comment(comment: String): Comment = new Comment(
+    Input.Stream(new InputStream {
+      override def read(): Int = 1
+    }, StandardCharsets.UTF_8),
+    dialects.Scala212,
+    -1,
+    -1,
+    comment
+  )
   val default = Comments(Nil, Nil)
-  def print(tree: Tree, treePrinted: Doc): Doc =
+  def print(tree: Tree, treePrinted: Doc)(implicit ctx: Context): Doc =
     Comments(tree).wrap(treePrinted)
-  def apply(tree: Tree): Comments = tree.origin match {
+  def apply(tree: Tree)(implicit ctx: Context): Comments = tree.origin match {
     case Origin.Parsed(Input.Stream(c: Comments, _), _, _) => c
-    case Origin.Parsed(input, dialect, pos) =>
-      tree.children match {
-        case head :: _ if head.pos.start == tree.pos.start => default
-        case _ =>
-          tree.children match {
-            case head :: _ =>
-//              logger.elem(head.syntax, head.pos.start, tree.pos.start)
-            case _ =>
-          }
-          inferCommentsFromTokens(dialect(input).tokenize.get, pos)
-      }
-    case _ => default
+    case _ => Comments(ctx.comments.leading(tree), ctx.comments.trailing(tree))
   }
 
   // Hacky approach to comments. TODO(olafur) keep track of trailing/leading
@@ -63,10 +65,8 @@ object Comments {
       tokens: Tokens,
       pos: TokenStreamPosition
   ): Comments = {
-    def slurp(it: Iterator[Token]) =
-      it.takeWhile(t => t.is[Trivia])
-        .collect { case c: Comment => c.syntax }
-        .toList
+    def slurp(it: Iterator[Token]): List[Comment] =
+      it.takeWhile(t => t.is[Trivia]).collect { case c: Comment => c }.toList
     val leading = slurp(
       if (pos.start == 0) tokens.view.takeWhile(_.is[Trivia]).reverseIterator
       else tokens.view(0, pos.start - 1).reverseIterator
@@ -92,7 +92,7 @@ object Comments {
      * to the indentation of the tree node.
      */
     def withLeadingComment(comment: String): T =
-      withComments(x => x.copy(leading = comment :: x.leading))
+      withComments(x => x.copy(leading = Comment(comment) :: x.leading))
 
     /**
      * Attach a trailing comment to this tree node.
@@ -109,7 +109,7 @@ object Comments {
      * to the indentation of the tree node.
      */
     def withTrailingComment(comment: String): T =
-      withComments(x => x.copy(trailing = comment :: x.trailing))
+      withComments(x => x.copy(trailing = Comment(comment) :: x.trailing))
 
     private def withComments(f: Comments => Comments): T = tree.withOrigin(
       tree.origin match {
