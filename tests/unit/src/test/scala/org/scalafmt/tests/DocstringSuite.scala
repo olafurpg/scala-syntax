@@ -4,6 +4,7 @@ import scala.meta._
 import scala.meta.internal.format.Comments._
 import org.scalafmt.internal.TreePrinter
 
+
 object DocstringSuite extends BaseScalaPrinterTest {
   test("docstring") {
     val foo = q"def foo = 2".withLeadingComment("/** Returns 2 */\n")
