@@ -37,8 +37,8 @@ trait DiffSuite extends FunSuite {
     if (obtained.length < 1000) {
       sb.append(
         s"""#${header("Obtained")}
-           #${stripTrailingWhitespace(obtained)}
-           #
+            #${stripTrailingWhitespace(obtained)}
+            #
             #""".stripMargin('#')
       )
     }

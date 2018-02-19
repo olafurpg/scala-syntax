@@ -9,8 +9,12 @@ import org.typelevel.paiges.Doc
 
 case class Comments(leading: List[String], trailing: List[String])
     extends InputStream {
+  def nonEmpty: Boolean = leading.nonEmpty || trailing.nonEmpty
   def join(ss: List[String]): Doc = Doc.intercalate(Doc.empty, ss.map(Doc.text))
-  def wrap(doc: Doc): Doc = join(leading) + doc + join(trailing)
+  def wrap(doc: Doc): Doc = {
+    pprint.log(leading)
+    join(leading) + doc + join(trailing)
+  }
   override def read(): Int = 1
 }
 
