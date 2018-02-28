@@ -1,3 +1,6 @@
+inThisBuild(List(
+  resolvers += Resolver.sonatypeRepo("snapshots")
+  ))
 // use fork of paiges with custom line combinators.
 // If these custom line combinators turn out to be useful, then we can try
 // to merge them upstream.

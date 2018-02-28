@@ -20,6 +20,11 @@ import scala.meta.Template
 import scala.meta.Term
 import scala.meta.Tree
 import scala.meta.Type
+import scala.meta.internal.fmt.SyntacticGroup.Literal
+import scala.meta.internal.fmt.SyntacticGroup.Pat._
+import scala.meta.internal.fmt.SyntacticGroup.Term._
+import scala.meta.internal.fmt.SyntacticGroup.Type._
+import scala.meta.internal.format.Comments
 import scala.meta.internal.format.CustomTrees.PatName
 import scala.meta.internal.prettyprinters.TripleQuotes
 import org.scalafmt.internal.ScalaToken._
@@ -30,12 +35,6 @@ import org.typelevel.paiges.Doc.intercalate
 import org.typelevel.paiges.Doc.line
 import org.typelevel.paiges.Doc.space
 import org.typelevel.paiges.Doc.text
-import org.scalafmt.internal.ScalaToken._
-import scala.meta.internal.fmt.SyntacticGroup.Literal
-import scala.meta.internal.fmt.SyntacticGroup.Term._
-import scala.meta.internal.fmt.SyntacticGroup.Type._
-import scala.meta.internal.fmt.SyntacticGroup.Pat._
-import scala.meta.internal.format.Comments
 
 object TreePrinter {
   import TreeDocOps._
@@ -56,7 +55,9 @@ object TreePrinter {
             val (quoteStyle, dquote) = dQuote(t.value)
             val dvalue = dRaw(t.value, quoteStyle)
             dquote + dvalue + dquote
-          case _ => text(tree.syntax) // ???
+          case t: Lit.Int => text(t.value.toString)
+          case t: Lit.Double => text(t.value.toString)
+          case _ => sys.error(tree.structure) //  text(tree.syntax) // ???
         }
       case _: Enumerator =>
         tree match {

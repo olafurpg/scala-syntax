@@ -12,12 +12,22 @@ object RefactorSuite extends BaseScalaPrinterTest {
   test("basic") {
     val code =
       """
+        |/**
+        | * Docstring
+        | */
         |object a {
+        |  // maps foo
         |  def bar = 2
         |
         |  // maps foo
-        |  @deprecated()
-        |  def foo = List(1) map foo
+        |  @deprecated() // bar
+        |  def foo = List(1 /* barr */) map /* buzz */foo
+        |
+        |
+        |  /**
+        |   * Docstring
+        |   */
+        |  def qux = 1
         |}
       """.stripMargin.parse[Source].get
     val comments = AssociatedComments(code)
@@ -27,22 +37,9 @@ object RefactorSuite extends BaseScalaPrinterTest {
       case t =>
         val leading = comments.leading(t).filterNot(done)
         val trailing = comments.trailing(t).filterNot(done)
-        val withLeading = leading.foldLeft(t) {
-          case (t, c) =>
-            done += c
-            t.withLeadingComment(c.syntax)
-        }
-        val withTrailing = trailing.foldLeft(withLeading) {
-          case (t, c) =>
-            done += c
-            t.withTrailingComment(c.syntax)
-        }
-        val c = Comments(withTrailing)
-        if (leading.nonEmpty) {
-          pprint.log(t.syntax)
-          pprint.log(c)
-        }
-        withTrailing
+        done ++= leading
+        done ++= trailing
+        t.withComments(leading.toList, trailing.toList)
     }
     def visit(tree: sourcecode.Text[Tree]): Unit = {
       pprint.log(tree.source)
@@ -54,9 +51,8 @@ object RefactorSuite extends BaseScalaPrinterTest {
     }
 
     val transformed = attached.transform {
-      case t @ Term.ApplyInfix(lhs, op, Nil, args) =>
-        visit(t)
-        q"$lhs.$op(..$args)"
+      case q"2" => q"42"
+      case Term.ApplyInfix(lhs, op, Nil, args) => q"$lhs.$op(..$args)"
     }
 
     visit(code)
@@ -65,18 +61,6 @@ object RefactorSuite extends BaseScalaPrinterTest {
 
     val obtained = TreePrinter.print(transformed).render(100)
     println(obtained)
-
-    val expected =
-      """
-        |object a {
-        |  def bar = 2
-        |
-        |  // maps foo
-        |  def foo = List(1).map(foo)
-        |}
-      """.stripMargin
-
-    assertNoDiff(obtained, expected)
 
   }
 

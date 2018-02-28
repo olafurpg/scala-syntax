@@ -19,6 +19,7 @@ case class Comments(leading: List[String], trailing: List[String])
 }
 
 object Comments {
+
   val default = Comments(Nil, Nil)
   def doc(tree: Tree, print: Doc): Doc = Comments(tree).wrap(print)
   def apply(tree: Tree): Comments = tree.origin match {
@@ -26,6 +27,31 @@ object Comments {
     case _ => default
   }
   implicit class XtensionTreeComments[T <: Tree](val tree: T) extends AnyVal {
+
+    def withComments(
+        leading: List[Token.Comment],
+        trailing: List[Token.Comment]
+    ): T = {
+      withComments { c =>
+        def syntaxLeading(token: Token.Comment): String =
+          syntax(token, isLeading = true)
+        def syntaxTrailing(token: Token.Comment): String =
+          syntax(token, isLeading = false)
+        def syntax(token: Token.Comment, isLeading: Boolean): String = {
+          val s = token.syntax
+          val suffix =
+            if (s.startsWith("//") ||
+              token.pos.startLine != token.pos.endLine) "\n"
+            else ""
+          val prefix = if (isLeading) "" else " "
+          prefix + s + suffix
+        }
+        Comments(
+          leading.iterator.map(syntaxLeading).toList ++ c.leading,
+          trailing.iterator.map(syntaxTrailing).toList ++ c.trailing
+        )
+      }
+    }
 
     /**
      * Attach a leading comment to this tree node.
