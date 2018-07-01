@@ -1,5 +1,6 @@
 package org.scalafmt.tests
 
+import org.scalafmt.internal.AssociatedTrivias
 import scala.meta._
 import scala.meta.internal.format.Comments._
 import org.scalafmt.internal.TreePrinter
@@ -55,4 +56,51 @@ $Foo
       """.stripMargin
     assertNoDiff(obtained, expected)
   }
+
+  test("existing") {
+    val tree =
+      """
+        |package a
+        |
+        |/** This is a docstring
+        |  *
+        |  * @param a is an int
+        |  */
+        |case class Foo(/* aaaa */ a: Int) { // trailing
+        |
+        |  /** This is a method */
+        |  def d = a
+        |}
+      """.stripMargin.parse[Source].get
+    val trivia = AssociatedTrivias(tree)
+    val syntheticMethod =
+      q"def b: Int = a".withLeadingComment("/** Returns a */\n")
+    val syntheticMethod2 =
+      q"def c: Int = a".withLeadingComment("/** Returns a again */\n")
+    val transformed = tree.transform {
+      case c: Defn.Class =>
+        c.copy(
+          templ = c.templ.copy(
+            stats = c.templ.stats ++ List(syntheticMethod, syntheticMethod2)
+          )
+        )
+    }
+    val obtained = TreePrinter.print(transformed, trivia).render(100)
+    println(obtained)
+
+    // package a
+    //
+    // /** This is a docstring
+    //  *
+    //  * @param a is an int
+    //  */
+    // case class Foo(a: Int) {
+    //   /** Returns a */
+    //   def b: Int = a
+    //
+    //   /** Returns a again */
+    //   def c: Int = a
+    // }
+  }
+
 }
