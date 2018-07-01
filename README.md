@@ -25,3 +25,88 @@ The current maintainers (people who can merge pull requests) are:
 
 - Guillaume Massé - [`@MasseGuillaume`](https://github.com/MasseGuillaume)
 - Ólafur Páll Geirsson - [`@olafurpg`](https://github.com/olafurpg)
+
+## Codegen
+
+It's possible to use scala-syntax for code generation as a replacement for the
+Scalameta built-in `Tree.syntax` method.  The main benefit of using
+scala-syntax over the built-in `.syntax` is that that docstrings are preserved
+after `Tree.transform`.
+To use scala-syntax for code generation in a sbt project `myCodeGeneration`
+
+```
+// build.sbt
+lazy val Syntax = RootProject(
+  uri(
+    "git://github.com/olafurpg/scala-syntax.git#681a291548197289350e854f0770aa912ed4d908"
+  )
+)
+lazy val syntax = ProjectRef(Syntax.build, "format")
+
+lazy val myCodeGeneration = project
+  .settings(...)
+  .dependsOn(syntax)
+```
+
+Then, in your pipeline
+
+1. parse the original tree that may contain docstrings
+1. collect the `AssociatedTrivias` of the original tree before transforming it
+1. transform the tree with `Tree.transform`
+1. print the transformed tree with `TreePrinter.print(tree, trivia)`
+
+In code, this will look roughly like this
+```scala
+import org.scalafmt.internal.AssociatedTrivias
+import scala.meta._
+import scala.meta.internal.format.Comments._
+import org.scalafmt.internal.TreePrinter
+
+val originalTree =
+  """
+    |package a
+    |
+    |/** This is a docstring
+    |  *
+    |  * @param a is an int
+    |  */
+    |case class Foo(/* aaaa */ a: Int) { // trailing
+    |
+    |  /** This is a method */
+    |  def d = a
+    |}
+  """.stripMargin.parse[Source].get
+val trivia = AssociatedTrivias(originalTree)
+val syntheticMethod =
+  q"def b: Int = a".withLeadingComment("/** Returns a */\n")
+val syntheticMethod2 =
+  q"def c: Int = a".withLeadingComment("/** Returns a again */\n")
+val transformedTree = originalTree.transform {
+  case c: Defn.Class =>
+    c.copy(
+      templ = c.templ.copy(
+        stats = c.templ.stats ++ List(syntheticMethod, syntheticMethod2)
+      )
+    )
+}
+
+val obtained = TreePrinter.print(transformedTree, trivia).render(100)
+println(obtained)
+// package a
+//
+// /** This is a docstring
+//  *
+//  * @param a is an int
+//  */
+// case class Foo(a: Int) {
+//
+//   /** This is a method */
+//   def d = a
+//
+//   /** Returns a */
+//   def b: Int = a
+//
+//   /** Returns a again */
+//   def c: Int = a
+// }
+```

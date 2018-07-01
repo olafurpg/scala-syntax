@@ -95,6 +95,10 @@ $Foo
     //  * @param a is an int
     //  */
     // case class Foo(a: Int) {
+    //
+    //   /** This is a method */
+    //   def d = a
+    //
     //   /** Returns a */
     //   def b: Int = a
     //
